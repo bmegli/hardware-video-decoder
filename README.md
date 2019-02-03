@@ -6,7 +6,9 @@ There are no performance loses (at the cost of library flexibility).
 Currently it supports VAAPI, VDPAU (tested) and a few other hardware decoders (not tested).
 Various codecs are supported (e.g. H.264, HEVC, VP8, VP9)
 
-See also library [documentation](https://bmegli.github.io/hardware-video-decoder/group__interface.html).
+See library [documentation](https://bmegli.github.io/hardware-video-decoder/group__interface.html).
+
+See also twin [HVE](https://github.com/bmegli/hardware-video-encoder) Hardware Video Encoder library.
 
 ## Intended Use
 
@@ -71,12 +73,12 @@ TO DO
 
 ## Using
 
-See examples directory for a more complete and commented examples with error handling.
+See examples directory for a more complete and commented examples with error handling (TO DO).
 
 There are just 4 functions and 3 user-visible data types:
 - `hvd_init`
-- `hve_send_packet` (sends compressed data to hardware)
-- `hve_receive_frame` (retrieves uncompressed data from hardware)
+- `hvd_send_packet` (sends compressed data to hardware)
+- `hvd_receive_frame` (retrieves uncompressed data from hardware)
 - `hvd_close`
 
 The library takes off you the burden of:
@@ -84,7 +86,43 @@ The library takes off you the burden of:
 - internal data lifecycle managegment
 
 ```C
-TO DO
+	struct hvd_config hardware_config = {"vaapi", "h264", "/dev/dri/renderD128"};
+	struct hvd *hardware_decoder = hvd_init(&hardware_config);
+	struct hvd_packet packet= {0}; //here we will be passing encoded data
+
+	//...
+	//whatever logic you have to prepare data source
+	//...
+
+	while(keep_decoding)
+	{
+		//...
+		//update your_data in some way (e.g. file read, network)
+		//...
+		packet.data = your_data; //set pointer to your encoded data
+		packet.size = your_data_size; //here some dummy size for dummy data
+
+		hvd_send_packet(hardware_decoder, &packet);
+
+		AVFrame *frame; //FFmpeg AVFrame, here we will be getting decoded data
+		int error;
+
+		while( (frame = hvd_receive_frame(hardware_decoder, &error) ) != NULL)
+		{
+			//...
+			//consume decoded video data in the frame (e.g. use frame.data, frame.linesize)
+			//...
+		}
+
+		if(error != HVD_OK)
+			break; //something bad happened
+	}
+	//flush the decoder when your are done by sending NULL packet
+	hvd_send_packet(hardware_decoder, NULL);
+	while( (frame = hvd_receive_frame(hardware_decoder, &error) ) != NULL)
+		; //do whatever you want with some last frames, here ignoring
+
+	hvd_close(hardware_decoder);
 ```
 
 That's it! You have just seen all the functions and data types in the library.
@@ -166,8 +204,4 @@ Like in LGPL, if you modify this library, you have to make your changes availabl
 Making a github fork of the library with your changes satisfies those requirements perfectly.
 
 Since you are linking to FFmpeg libraries. Consider also `avcodec` and `avutil` licensing.
-
-## Additional information
-
-...
 
