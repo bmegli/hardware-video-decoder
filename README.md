@@ -26,12 +26,12 @@ Cross-platform but tested only on Linux (Ubuntu 18.04).
 ## Hardware
 
 Tested with:
-- Intel VAAPI compatible hardware encoders ([Quick Sync Video](https://ark.intel.com/Search/FeatureFilter?productType=processors&QuickSyncVideo=true))
-- VDPAU compatible hardware encoders (e.g. Nvidia GPU) 
+- Intel VAAPI compatible hardware decoders ([Quick Sync Video](https://ark.intel.com/Search/FeatureFilter?productType=processors&QuickSyncVideo=true))
+- VDPAU compatible hardware decoders (e.g. Nvidia GPU) 
 
 Also implemented (but not tested):
-- DirectX Video Acceleration (dxva2)
-- DirectX Video Acceleration (d3d11va)
+- DirectX 9 Video Acceleration (dxva2)
+- DirectX 11 Video Acceleration (d3d11va)
 - VideoToolbox
 
 ## Dependencies
@@ -113,9 +113,6 @@ The library takes off you the burden of:
 			//consume decoded video data in the frame (e.g. use frame.data, frame.linesize)
 			//...
 		}
-
-		if(error != HVD_OK)
-			break; //something bad happened
 	}
 	//flush the decoder when your are done by sending NULL packet
 	hvd_send_packet(hardware_decoder, NULL);
@@ -203,5 +200,5 @@ This is similiar to LGPL but more permissive:
 Like in LGPL, if you modify this library, you have to make your changes available.
 Making a github fork of the library with your changes satisfies those requirements perfectly.
 
-Since you are linking to FFmpeg libraries. Consider also `avcodec` and `avutil` licensing.
+You are linking to FFmpeg libraries. Consider also `avcodec` and `avutil` and the codec licensing.
 
