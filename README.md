@@ -27,6 +27,7 @@ Cross-platform but tested only on Linux (Ubuntu 18.04).
 
 Tested with:
 - Intel VAAPI compatible hardware decoders ([Quick Sync Video](https://ark.intel.com/Search/FeatureFilter?productType=processors&QuickSyncVideo=true))
+- AMD/ATI VAAPI compatible hardware decoders
 - VDPAU compatible hardware decoders (e.g. Nvidia GPU) 
 
 Also implemented (but not tested):
@@ -69,21 +70,21 @@ make
 
 ## Running Example
 
-TO DO
+```bash
+./hvd-decoding-example
+```
+
+Follow with printed usage examples.
 
 ## Using
 
-See examples directory for a more complete and commented examples with error handling (TO DO).
+See examples directory for a more complete and commented examples with error handling.
 
 There are just 4 functions and 3 user-visible data types:
 - `hvd_init`
 - `hvd_send_packet` (sends compressed data to hardware)
 - `hvd_receive_frame` (retrieves uncompressed data from hardware)
 - `hvd_close`
-
-The library takes off you the burden of:
-- hardware decoder initialization/cleanup
-- internal data lifecycle managegment
 
 ```C
 	struct hvd_config hardware_config = {"vaapi", "h264", "/dev/dri/renderD128"};
