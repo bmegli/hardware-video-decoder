@@ -129,7 +129,7 @@ void hvd_close(struct hvd *h);
 /**
  * @brief Send packet to hardware for decoding.
  *
- * Pass data in hvd_packet for encoding.
+ * Pass data in hvd_packet for decoding.
  * Follow with hvd_receive_frame to get decoded data from hardware.
  *
  * If you have simple loop like:
