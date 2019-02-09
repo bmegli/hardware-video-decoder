@@ -161,12 +161,16 @@ static enum AVPixelFormat hvd_get_hw_pix_format(AVCodecContext *ctx, const enum 
 
 void hvd_close(struct hvd* h)
 {
-	//av_packet_unref(&h->enc_pkt);
+	if(h == NULL)
+		return;
+
 	av_frame_free(&h->sw_frame);
 	av_frame_free(&h->hw_frame);
 
 	avcodec_free_context(&h->decoder_ctx);
 	av_buffer_unref(&h->hw_device_ctx);
+
+	free(h);
 }
 
 static struct hvd *hvd_close_and_return_null(struct hvd *h)
