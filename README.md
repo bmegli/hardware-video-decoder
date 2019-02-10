@@ -87,7 +87,7 @@ There are just 4 functions and 3 user-visible data types:
 - `hvd_close`
 
 ```C
-	struct hvd_config hardware_config = {"vaapi", "h264", "/dev/dri/renderD128"};
+	struct hvd_config hardware_config = {"vaapi", "h264", "/dev/dri/renderD128", "rgb0"};
 	struct hvd *hardware_decoder = hvd_init(&hardware_config);
 	struct hvd_packet packet= {0}; //here we will be passing encoded data
 
@@ -202,4 +202,3 @@ Like in LGPL, if you modify this library, you have to make your changes availabl
 Making a github fork of the library with your changes satisfies those requirements perfectly.
 
 You are linking to FFmpeg libraries. Consider also `avcodec` and `avutil` and the codec licensing.
-

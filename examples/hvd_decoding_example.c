@@ -21,7 +21,7 @@ int hint_on_init_failure_and_return_1(const struct hvd_config *hardware_config);
 
 int main(int argc, char **argv)
 {	
-	struct hvd_config hardware_config;
+	struct hvd_config hardware_config = {0};
 	struct hvd* hardware_decoder;
 
 	if(process_user_input(argc, argv, &hardware_config) != 0)
