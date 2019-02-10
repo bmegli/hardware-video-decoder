@@ -64,6 +64,22 @@ struct hvd;
  * - vp9
  * - ...
  *
+ * The pixel_format is format you want to receive data in.
+ * Only hardware conversions are supported. If you select
+ * something unsupported by hardware, the library will dump for you
+ * list of supported pixel formats to standard error. From my experience
+ * even those reported are not supported in all scenarios.
+ *
+ * Typical examples:
+ * - nv12
+ * - yuv420p (this is generally safe choice)
+ * - rgb0
+ * - bgr0
+ * - ...
+ *
+ * For pixel format explanation see:
+ * <a href="https://ffmpeg.org/doxygen/3.4/pixfmt_8h.html#a9a8e335cf3be472042bc9f0cf80cd4c5">FFmpeg pixel formats</a>
+ *
  * @see hvd_init
  */
 struct hvd_config
@@ -71,7 +87,7 @@ struct hvd_config
 	const char *hardware; //!< hardware type for decoding, e.g. "vaapi"
 	const char *codec; //!< codec name, e.g. "h264", "vp8"
 	const char *device; //!< NULL or device, e.g. "/dev/dri/renderD128"
-	const char *pixel_format; //!< NULL for default or format, e.g. "RGB0", "BGR0", "NV12", "YUV420P"
+	const char *pixel_format; //!< NULL for default or format, e.g. "rgb0", "bgr0", "nv12", "yuv420p"
 };
 
 /**
@@ -136,10 +152,10 @@ void hvd_close(struct hvd *h);
  * If you have simple loop like:
  * - send encoded data with hve_send_packet
  * - receive decoded data with hve_receive_frame
- * 
+ *
  * HVD_AGAIN return value will never happen.
  * If you are sending lots of data and not reading you may get HVD_AGAIN when buffers are full.
- * 
+ *
  * When you are done with decoding call with:
  * - NULL packet argument
  * - or packet with NULL data and 0 size
@@ -155,15 +171,15 @@ void hvd_close(struct hvd *h);
  * @return
  * - HVD_OK on success
  * - HVD_ERROR on error
- * - HVD_AGAIN input was rejected, read data with hvd_receive_packet before next try 
+ * - HVD_AGAIN input was rejected, read data with hvd_receive_packet before next try
  *
  * @see hvd_packet, hvd_receive_frame
- * 
+ *
  * Example flushing:
  * @code
  *  //flush
  *  hvd_send_packet(hardware_decoder, NULL);
- *  
+ *
  *  //retrieve last frames from decoder as usual
  *	while( (frame=hvd_receive_frame(hardware_decoder, &failed)) )
  *	{
@@ -196,13 +212,13 @@ int hvd_send_packet(struct hvd *h, struct hvd_packet *packet);
  * - NULL when no more data is pending, query error argument to check result (HVD_OK on success)
  *
  * @see hvd_send_packet
- * 
+ *
  * Example (in decoding loop):
  * @code
  * //send data for hardware decoding
  * if(hvd_send_packet(h, packet) != HVD_OK)
  *   break; //break on error
- * 
+ *
  * //get the decoded data
  * while( (frame = hvd_receive_frame(av, &error) ) )
  * {

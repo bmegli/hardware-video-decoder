@@ -34,6 +34,7 @@ struct hvd
 static struct hvd *hvd_close_and_return_null(struct hvd *h);
 static enum AVPixelFormat hvd_find_pixel_fmt_by_hw_type(const enum AVHWDeviceType type);
 static enum AVPixelFormat hvd_get_hw_pix_format(AVCodecContext *ctx, const enum AVPixelFormat *pix_fmts);
+static void hvd_dump_sw_pix_formats(struct hvd *h);
 
 //NULL on error
 struct hvd *hvd_init(const struct hvd_config *config)
@@ -265,10 +266,33 @@ AVFrame *hvd_receive_frame(struct hvd *h, int *error)
 
 	if ( (ret = av_hwframe_transfer_data(h->sw_frame, h->hw_frame, 0) ) < 0)
 	{
-		fprintf(stderr, "hvd: unable to transfer data to system memory\n");
+		fprintf(stderr, "hvd: unable to transfer data to system memory - \"%s\"\n", av_err2str(ret));
+		hvd_dump_sw_pix_formats(h);
 		return NULL;
 	}
 
 	*error=HVD_OK;
 	return h->sw_frame;
+}
+
+static void hvd_dump_sw_pix_formats(struct hvd *h)
+{
+	enum AVPixelFormat *formats, *iterator;
+
+	if(av_hwframe_transfer_get_formats(h->hw_frame->hw_frames_ctx, AV_HWFRAME_TRANSFER_DIRECTION_FROM, &formats, 0) < 0)
+	{
+		fprintf(stderr, "hvd: failed to get transfer formats\n");
+		return;
+	}
+	iterator=formats;
+
+	fprintf(stderr, "hvd: make sure you are using supported software pixel format:\n");
+
+	while(*iterator != AV_PIX_FMT_NONE)
+	{
+		fprintf(stderr, "%d : %s\n", *iterator, av_get_pix_fmt_name (*iterator));
+		++iterator;
+	}
+
+	av_free(formats);
 }
