@@ -71,6 +71,7 @@ struct hvd_config
 	const char *hardware; //!< hardware type for decoding, e.g. "vaapi"
 	const char *codec; //!< codec name, e.g. "h264", "vp8"
 	const char *device; //!< NULL or device, e.g. "/dev/dri/renderD128"
+	const char *pixel_format; //!< NULL for default or format, e.g. "RGB0", "BGR0", "NV12", "YUV420P"
 };
 
 /**

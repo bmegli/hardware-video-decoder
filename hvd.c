@@ -24,6 +24,7 @@ struct hvd
 {
 	AVBufferRef* hw_device_ctx;
 	enum AVPixelFormat hw_pix_fmt;
+	enum AVPixelFormat sw_pix_fmt;
 	AVCodecContext* decoder_ctx;
 	AVFrame *sw_frame;
 	AVFrame *hw_frame;
@@ -101,6 +102,15 @@ struct hvd *hvd_init(const struct hvd_config *config)
 	if (( err = avcodec_open2(h->decoder_ctx, decoder, NULL)) < 0)
 	{
 		fprintf(stderr, "hvd: failed to initialize decoder context for %s\n", decoder->name);
+		return hvd_close_and_return_null(h);
+	}
+
+	//try to find software pixel format that user wants
+	if(config->pixel_format == NULL)
+		h->sw_pix_fmt = AV_PIX_FMT_NONE;
+	else if( ( h->sw_pix_fmt = av_get_pix_fmt(config->pixel_format) ) == AV_PIX_FMT_NONE )
+	{
+		fprintf(stderr, "hvd: failed to find pixel format %s\n", config->pixel_format);
 		return hvd_close_and_return_null(h);
 	}
 
@@ -250,6 +260,8 @@ AVFrame *hvd_receive_frame(struct hvd *h, int *error)
 		return NULL;
 	}
 	// at this point we have a valid frame decoded in hardware
+	// try to supply user software frame in the desired format
+	h->sw_frame->format=h->sw_pix_fmt;
 
 	if ( (ret = av_hwframe_transfer_data(h->sw_frame, h->hw_frame, 0) ) < 0)
 	{
