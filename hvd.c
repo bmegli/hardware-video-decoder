@@ -50,7 +50,7 @@ struct hvd *hvd_init(const struct hvd_config *config)
 		return NULL;
 	}
 
-	*h = zero_hvd; //set all members of dynamically allocated struct to 0 in a portable way 
+	*h = zero_hvd; //set all members of dynamically allocated struct to 0 in a portable way
 
 	avcodec_register_all();
 	av_log_set_level(AV_LOG_VERBOSE);
@@ -88,7 +88,10 @@ struct hvd *hvd_init(const struct hvd_config *config)
 	h->decoder_ctx->opaque = h;
 	h->decoder_ctx->get_format = hvd_get_hw_pix_format;
 
-	if ( (err = av_hwdevice_ctx_create(&h->hw_device_ctx, hardware_type, config->device, NULL, 0) ) < 0)
+	//specified device or NULL / empty string for default
+	const char *device = (config->device != NULL && config->device[0] != '\0') ? config->device : NULL;
+
+	if ( (err = av_hwdevice_ctx_create(&h->hw_device_ctx, hardware_type, device, NULL, 0) ) < 0)
 	{
 		fprintf(stderr, "hvd: failed to create %s device.\n", config->hardware);
 		return hvd_close_and_return_null(h);
@@ -107,7 +110,7 @@ struct hvd *hvd_init(const struct hvd_config *config)
 	}
 
 	//try to find software pixel format that user wants
-	if(config->pixel_format == NULL)
+	if(config->pixel_format == NULL || config->pixel_format[0] == '\0')
 		h->sw_pix_fmt = AV_PIX_FMT_NONE;
 	else if( ( h->sw_pix_fmt = av_get_pix_fmt(config->pixel_format) ) == AV_PIX_FMT_NONE )
 	{
