@@ -20,7 +20,7 @@ int process_user_input(int argc, char **argv, struct hvd_config *config);
 int hint_on_init_failure_and_return_1(const struct hvd_config *hardware_config);
 
 int main(int argc, char **argv)
-{	
+{
 	struct hvd_config hardware_config = {0};
 	struct hvd* hardware_decoder;
 
@@ -29,9 +29,9 @@ int main(int argc, char **argv)
 
 	if( (hardware_decoder = hvd_init(&hardware_config) ) == NULL )
 		return hint_on_init_failure_and_return_1(&hardware_config);
-	
+
 	printf("initialized decoder...\n");
-	
+
 	//...
 	//whatever logic you have to prepare data source
 	//...
@@ -43,10 +43,10 @@ int main(int argc, char **argv)
 	//...
 
 	hvd_close(hardware_decoder);
-	
+
 	printf("closed decoder...\n");
 	printf("bye...\n");
-	
+
 	return 0;
 }
 
@@ -65,25 +65,25 @@ void decoding_loop(struct hvd *hardware_decoder)
 		//...
 		//update your_data in some way (e.g. file read, network)
 		//...
-		
+
 		//fill hvd_packet with encoded data
-		
+
 		//packet.data = your_data; //set pointer to your encoded data
 		//packet.size = your_data_size; //here some dummy size for dummy data
-		
+
 		if( hvd_send_packet(hardware_decoder, &packet) != HVD_OK )
-		{	
+		{
 			fprintf(stderr, "failed to send data for decoding");
 			break;
 		}
-		
+
 		while( (frame = hvd_receive_frame(hardware_decoder, &error) ) != NULL)
 		{
 			//...
 			//consume decoded video data in the frame (e.g. use frame.data, frame.linesize)
 			//...
 		}
-		
+
 		if(error != HVD_OK)
 		{
 			fprintf(stderr, "failed to decode data\n");
@@ -112,11 +112,11 @@ int process_user_input(int argc, char **argv, struct hvd_config *config)
 		fprintf(stderr, "%s videotoolbox h264 \n", argv[0]);
 		return 1;
 	}
-	
+
 	config->hardware = argv[1];
 	config->codec = argv[2];
 	config->device = argv[3]; //NULL or device, both are ok
-	
+
 	return 0;
 }
 
