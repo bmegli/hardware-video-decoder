@@ -40,7 +40,7 @@ static void hvd_dump_sw_pix_formats(struct hvd *h);
 struct hvd *hvd_init(const struct hvd_config *config)
 {
 	struct hvd *h, zero_hvd = {0};
-	enum AVHWDeviceType hardware_type;
+//	enum AVHWDeviceType hardware_type;
 	AVCodec *decoder = NULL;
 	int err;
 
@@ -54,7 +54,7 @@ struct hvd *hvd_init(const struct hvd_config *config)
 
 	avcodec_register_all();
 	av_log_set_level(AV_LOG_VERBOSE);
-
+/*
 	if( (hardware_type = av_hwdevice_find_type_by_name(config->hardware) ) == AV_HWDEVICE_TYPE_NONE )
 	{
 		fprintf(stderr, "hvd: cannot find hardware decoder %s\n", config->hardware);
@@ -68,7 +68,7 @@ struct hvd *hvd_init(const struct hvd_config *config)
 		fprintf(stderr, "hvd: unable to find pixel format for %s\n", config->hardware);
 		return hvd_close_and_return_null(h);
 	}
-
+*/
 	if( ( decoder=avcodec_find_decoder_by_name(config->codec) ) == NULL)
 	{
 		fprintf(stderr, "hvd: cannot find decoder %s\n", config->codec);
@@ -80,7 +80,7 @@ struct hvd *hvd_init(const struct hvd_config *config)
 		fprintf(stderr, "hvd: failed to alloc decoder context, no memory?\n");
 		return hvd_close_and_return_null(h);
 	}
-
+/*
 	//Set user data carried by AVContext, we need this to determine pixel format
 	//from within FFmpeg using our supplied function for decoder_ctx->get_format.
 	//This is MUCH easier in FFmpeg 4.0 with avcodec_get_hw_config but we want
@@ -102,13 +102,13 @@ struct hvd *hvd_init(const struct hvd_config *config)
 		fprintf(stderr, "hvd: unable to reference hw_device_ctx.\n");
 		return hvd_close_and_return_null(h);
 	}
-
+*/
 	if (( err = avcodec_open2(h->decoder_ctx, decoder, NULL)) < 0)
 	{
 		fprintf(stderr, "hvd: failed to initialize decoder context for %s\n", decoder->name);
 		return hvd_close_and_return_null(h);
 	}
-
+/*
 	//try to find software pixel format that user wants
 	if(config->pixel_format == NULL || config->pixel_format[0] == '\0')
 		h->sw_pix_fmt = AV_PIX_FMT_NONE;
@@ -117,7 +117,7 @@ struct hvd *hvd_init(const struct hvd_config *config)
 		fprintf(stderr, "hvd: failed to find pixel format %s\n", config->pixel_format);
 		return hvd_close_and_return_null(h);
 	}
-
+*/
 	av_init_packet(&h->av_packet);
 	h->av_packet.data = NULL;
 	h->av_packet.size = 0;
@@ -234,10 +234,10 @@ AVFrame *hvd_receive_frame(struct hvd *h, int *error)
 	*error = HVD_ERROR;
 	//free the leftovers from the last call (if any)
 	//this will happen here or in hvd_close, whichever is first
-	av_frame_free(&h->hw_frame);
-	av_frame_free(&h->sw_frame);
+	av_frame_free(&h->hw_frame); //NOTE - use hw_frame for SOFTWARE, not HARDWARE here
+	//av_frame_free(&h->sw_frame);
 
-	if ( !( h->hw_frame = av_frame_alloc() ) || !( h->sw_frame = av_frame_alloc() ) )
+	if ( !( h->hw_frame = av_frame_alloc() ) ) // || !( h->sw_frame = av_frame_alloc() ) )
 	{
 		fprintf(stderr, "hvd: unable to av_frame_alloc frame\n");
 		return NULL;
@@ -258,6 +258,7 @@ AVFrame *hvd_receive_frame(struct hvd *h, int *error)
 		return NULL;
 	}
 
+	/*
 	if (h->hw_frame->format != h->hw_pix_fmt)
 	{	//this would be the place to add fallback to software but we want to treat it as error
 		fprintf(stderr, "hvd: frame decoded in software (not in hardware)\n");
@@ -273,9 +274,10 @@ AVFrame *hvd_receive_frame(struct hvd *h, int *error)
 		hvd_dump_sw_pix_formats(h);
 		return NULL;
 	}
+	*/
 
 	*error=HVD_OK;
-	return h->sw_frame;
+	return h->hw_frame;
 }
 
 static void hvd_dump_sw_pix_formats(struct hvd *h)
