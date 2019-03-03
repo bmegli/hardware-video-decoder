@@ -16,6 +16,10 @@
 #include <libavutil/hwcontext.h>
 #include <libavutil/pixdesc.h>
 
+// FFmpeg avformat
+#include <libavformat/avformat.h>
+
+
 #include <stdio.h> //fprintf
 #include <stdlib.h> //malloc
 
@@ -48,7 +52,8 @@ struct hvd
 	AVBufferRef* hw_device_ctx;
 	enum AVPixelFormat hw_pix_fmt;
 	enum AVPixelFormat sw_pix_fmt;
-	AVCodecContext* decoder_ctx;
+	AVCodecContext *decoder_ctx;
+	AVFormatContext *input_ctx;
 	AVFrame *sw_frame;
 	AVFrame *hw_frame;
 	AVPacket av_packet;
@@ -70,8 +75,10 @@ struct hvd *hvd_init(const struct hvd_config *config)
 {
 	struct hvd *h, zero_hvd = {0};
 	enum AVHWDeviceType hardware_type;
-	AVCodec *decoder = NULL;
+	AVCodec *decoder = NULL, *stream_decoder = NULL;
 	int err;
+	int ret;
+	AVStream *video = NULL;
 
 	JNIEnv *jni_env = 0;
 
@@ -104,13 +111,12 @@ struct hvd *hvd_init(const struct hvd_config *config)
 	avcodec_register_all();
 	av_log_set_level(AV_LOG_TRACE);
 	av_log_set_callback(custom_log);
-/*
+
 	if( (hardware_type = av_hwdevice_find_type_by_name(config->hardware) ) == AV_HWDEVICE_TYPE_NONE )
 	{
 		fprintf(stderr, "hvd: cannot find hardware decoder %s\n", config->hardware);
 		return hvd_close_and_return_null(h);
 	}
-
 
 	//This is MUCH easier in FFmpeg 4.0 with avcodec_get_hw_config but we want
 	//to support FFmpeg 3.4 (system FFmpeg on Ubuntu 18.04 until 2028).
@@ -119,7 +125,7 @@ struct hvd *hvd_init(const struct hvd_config *config)
 		fprintf(stderr, "hvd: unable to find pixel format for %s\n", config->hardware);
 		return hvd_close_and_return_null(h);
 	}
-*/
+
 	if( ( decoder=avcodec_find_decoder_by_name(config->codec) ) == NULL)
 	{
 		fprintf(stderr, "hvd: cannot find decoder %s\n", config->codec);
@@ -137,13 +143,13 @@ struct hvd *hvd_init(const struct hvd_config *config)
 	//This is MUCH easier in FFmpeg 4.0 with avcodec_get_hw_config but we want
 	//to support FFmpeg 3.4 (system FFmpeg on Ubuntu 18.04 until 2028).
 	h->decoder_ctx->opaque = h;
-	//temp
-	//h->decoder_ctx->get_format = hvd_get_hw_pix_format;
+	h->decoder_ctx->get_format = hvd_get_hw_pix_format;
 
 	//specified device or NULL / empty string for default
-	const char *device = (config->device != NULL && config->device[0] != '\0') ? config->device : NULL;
-/*
-	if ( (err = av_hwdevice_ctx_create(&h->hw_device_ctx, hardware_type, device, NULL, 0) ) < 0)
+//	const char *device = (config->device != NULL && config->device[0] != '\0') ? config->device : NULL;
+
+	//DEVICE -> NULL
+	if ( (err = av_hwdevice_ctx_create(&h->hw_device_ctx, hardware_type, NULL, NULL, 0) ) < 0)
 	{
 		fprintf(stderr, "hvd: failed to create %s device.\n", config->hardware);
 		return hvd_close_and_return_null(h);
@@ -154,13 +160,43 @@ struct hvd *hvd_init(const struct hvd_config *config)
 		fprintf(stderr, "hvd: unable to reference hw_device_ctx.\n");
 		return hvd_close_and_return_null(h);
 	}
-*/
+
+	/* open the input file */
+	// !!! USE device as file name for test
+    if (avformat_open_input(&h->input_ctx, config->device, NULL, NULL) != 0)
+	{
+        fprintf(stderr, "hvd: cannot open input file '%s'\n", config->device);
+		return hvd_close_and_return_null(h);
+    }
+
+    if (avformat_find_stream_info(h->input_ctx, NULL) < 0)
+	{
+        fprintf(stderr, "hvd: cannot find input stream information.\n");
+		return hvd_close_and_return_null(h);
+    }
+
+    /* find the video stream information */
+    ret = av_find_best_stream(h->input_ctx, AVMEDIA_TYPE_VIDEO, -1, -1, &stream_decoder, 0);
+    if (ret < 0)
+	{
+        fprintf(stderr, "hvd: cannot find a video stream in the input file\n");
+        return hvd_close_and_return_null(h);
+    }
+
+	video = h->input_ctx->streams[ret];
+	
+    if (avcodec_parameters_to_context(h->decoder_ctx, video->codecpar) < 0)
+	{
+		fprintf(stderr, "hvd: cannot find a video stream in the input file\n");
+		return hvd_close_and_return_null(h);
+	}
+
 	if (( err = avcodec_open2(h->decoder_ctx, decoder, NULL)) < 0)
 	{
 		fprintf(stderr, "hvd: failed to initialize decoder context for %s, error %s\n", decoder->name, av_err2str(err));
 		return hvd_close_and_return_null(h);
 	}
-/*
+
 	//try to find software pixel format that user wants
 	if(config->pixel_format == NULL || config->pixel_format[0] == '\0')
 		h->sw_pix_fmt = AV_PIX_FMT_NONE;
@@ -169,10 +205,12 @@ struct hvd *hvd_init(const struct hvd_config *config)
 		fprintf(stderr, "hvd: failed to find pixel format %s\n", config->pixel_format);
 		return hvd_close_and_return_null(h);
 	}
-*/
+
 	av_init_packet(&h->av_packet);
 	h->av_packet.data = NULL;
 	h->av_packet.size = 0;
+
+	__android_log_print(ANDROID_LOG_DEBUG, "hvd", "SUCCESSFULLY OPENED DECODER CONTEXT");	
 
 	return h;
 }
@@ -201,9 +239,9 @@ static enum AVPixelFormat hvd_find_pixel_fmt_by_hw_type(const enum AVHWDeviceTyp
 	case AV_HWDEVICE_TYPE_VIDEOTOOLBOX:
 		fmt = AV_PIX_FMT_VIDEOTOOLBOX;
 		break;
-//	case AV_HWDEVICE_TYPE_MEDIACODEC:
-//		fmt = AV_PIX_FMT_MEDIACODEC;
-//		break;
+	case AV_HWDEVICE_TYPE_MEDIACODEC:
+		fmt = AV_PIX_FMT_MEDIACODEC;
+		break;
 	default:
 		fmt = AV_PIX_FMT_NONE;
 		break;
@@ -238,6 +276,8 @@ void hvd_close(struct hvd* h)
 
 	av_frame_free(&h->sw_frame);
 	av_frame_free(&h->hw_frame);
+
+	avformat_close_input(&h->input_ctx);
 
 	avcodec_free_context(&h->decoder_ctx);
 	av_buffer_unref(&h->hw_device_ctx);
@@ -315,7 +355,7 @@ AVFrame *hvd_receive_frame(struct hvd *h, int *error)
 			fprintf(stderr, "hvd: error while decoding %d\n", ret);
 		return NULL;
 	}
-/*
+
 	if (h->hw_frame->format != h->hw_pix_fmt)
 	{	//this would be the place to add fallback to software but we want to treat it as error
 		fprintf(stderr, "hvd: frame decoded in software (not in hardware)\n");
@@ -331,14 +371,13 @@ AVFrame *hvd_receive_frame(struct hvd *h, int *error)
 		hvd_dump_sw_pix_formats(h);
 		return NULL;
 	}
-*/
 
 	fprintf(stderr, "hvd: decoded frame with pixel format %d %s\n", h->hw_frame->format, av_get_pix_fmt_name(h->hw_frame->format));
 
 	*error=HVD_OK;
 
 	//TEMP
-	return h->hw_frame;
+	//return h->hw_frame;
 	
 	return h->sw_frame;
 }
