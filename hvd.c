@@ -36,13 +36,13 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* aReserved)
 {
 	g_vm = vm;
 	//JNIEnv* env;
-   // if ( vm->GetEnv( (void**)(&env), JNI_VERSION_1_6 ) != JNI_OK ) 
+   // if ( vm->GetEnv( (void**)(&env), JNI_VERSION_1_6 ) != JNI_OK )
    //     return -1;
-    
+
     // Get jclass with env->FindClass.
     // Register methods with env->RegisterNatives.
 	__android_log_write(ANDROID_LOG_DEBUG, "hvd", "JNI ON LOAD\n");
-	
+
 	return JNI_VERSION_1_6;
 }
 
@@ -54,6 +54,7 @@ struct hvd
 	enum AVPixelFormat sw_pix_fmt;
 	AVCodecContext *decoder_ctx;
 	AVFormatContext *input_ctx;
+	int video_stream;
 	AVFrame *sw_frame;
 	AVFrame *hw_frame;
 	AVPacket av_packet;
@@ -83,7 +84,7 @@ struct hvd *hvd_init(const struct hvd_config *config)
 	JNIEnv *jni_env = 0;
 
 	int getEnvStat = (*g_vm)->GetEnv(g_vm,(void**) &jni_env, JNI_VERSION_1_6);
-	
+
     if (getEnvStat == JNI_EDETACHED)
 	{
 		__android_log_print(ANDROID_LOG_DEBUG, "hvd", "getenv not attached");
@@ -99,7 +100,7 @@ struct hvd *hvd_init(const struct hvd_config *config)
 		__android_log_print(ANDROID_LOG_DEBUG, "hvd", "get env version not supported");
 
 	av_jni_set_java_vm(g_vm, NULL);
-	
+
 	if( ( h = (struct hvd*)malloc(sizeof(struct hvd))) == NULL )
 	{
 		fprintf(stderr, "hvd: not enough memory for hvd\n");
@@ -112,12 +113,15 @@ struct hvd *hvd_init(const struct hvd_config *config)
 	av_log_set_level(AV_LOG_TRACE);
 	av_log_set_callback(custom_log);
 
+/*
 	if( (hardware_type = av_hwdevice_find_type_by_name(config->hardware) ) == AV_HWDEVICE_TYPE_NONE )
 	{
 		fprintf(stderr, "hvd: cannot find hardware decoder %s\n", config->hardware);
 		return hvd_close_and_return_null(h);
 	}
+*/
 
+/*
 	//This is MUCH easier in FFmpeg 4.0 with avcodec_get_hw_config but we want
 	//to support FFmpeg 3.4 (system FFmpeg on Ubuntu 18.04 until 2028).
 	if( ( h->hw_pix_fmt = hvd_find_pixel_fmt_by_hw_type(hardware_type) ) == AV_PIX_FMT_NONE)
@@ -125,6 +129,7 @@ struct hvd *hvd_init(const struct hvd_config *config)
 		fprintf(stderr, "hvd: unable to find pixel format for %s\n", config->hardware);
 		return hvd_close_and_return_null(h);
 	}
+*/
 
 	if( ( decoder=avcodec_find_decoder_by_name(config->codec) ) == NULL)
 	{
@@ -143,24 +148,26 @@ struct hvd *hvd_init(const struct hvd_config *config)
 	//This is MUCH easier in FFmpeg 4.0 with avcodec_get_hw_config but we want
 	//to support FFmpeg 3.4 (system FFmpeg on Ubuntu 18.04 until 2028).
 	h->decoder_ctx->opaque = h;
-	h->decoder_ctx->get_format = hvd_get_hw_pix_format;
+	//h->decoder_ctx->get_format = hvd_get_hw_pix_format;
 
 	//specified device or NULL / empty string for default
 //	const char *device = (config->device != NULL && config->device[0] != '\0') ? config->device : NULL;
-
+/*
 	//DEVICE -> NULL
 	if ( (err = av_hwdevice_ctx_create(&h->hw_device_ctx, hardware_type, NULL, NULL, 0) ) < 0)
 	{
 		fprintf(stderr, "hvd: failed to create %s device.\n", config->hardware);
 		return hvd_close_and_return_null(h);
 	}
+*/
 
+/*
 	if( (h->decoder_ctx->hw_device_ctx = av_buffer_ref(h->hw_device_ctx) ) == NULL)
 	{
 		fprintf(stderr, "hvd: unable to reference hw_device_ctx.\n");
 		return hvd_close_and_return_null(h);
 	}
-
+*/
 	/* open the input file */
 	// !!! USE device as file name for test
     if (avformat_open_input(&h->input_ctx, config->device, NULL, NULL) != 0)
@@ -182,9 +189,10 @@ struct hvd *hvd_init(const struct hvd_config *config)
         fprintf(stderr, "hvd: cannot find a video stream in the input file\n");
         return hvd_close_and_return_null(h);
     }
+	h->video_stream=ret;
 
-	video = h->input_ctx->streams[ret];
-	
+	video = h->input_ctx->streams[h->video_stream];
+
     if (avcodec_parameters_to_context(h->decoder_ctx, video->codecpar) < 0)
 	{
 		fprintf(stderr, "hvd: cannot find a video stream in the input file\n");
@@ -209,8 +217,6 @@ struct hvd *hvd_init(const struct hvd_config *config)
 	av_init_packet(&h->av_packet);
 	h->av_packet.data = NULL;
 	h->av_packet.size = 0;
-
-	__android_log_print(ANDROID_LOG_DEBUG, "hvd", "SUCCESSFULLY OPENED DECODER CONTEXT");	
 
 	return h;
 }
@@ -259,7 +265,7 @@ static enum AVPixelFormat hvd_get_hw_pix_format(AVCodecContext *ctx, const enum 
 	{
 		//temp
 		fprintf(stderr, "hvd: checking format %d %s\n", *p, av_get_pix_fmt_name(*p));
-	
+
 		if (*p == h->hw_pix_fmt)
 			return *p;
 	}
@@ -295,6 +301,28 @@ int hvd_send_packet(struct hvd *h,struct hvd_packet *packet)
 {
 	int err;
 
+	av_packet_unref(&h->av_packet);
+
+	if ((err = av_read_frame(h->input_ctx, &h->av_packet)) < 0)
+	{
+		fprintf(stderr, "hvd: failed to read frame with av_read_frame %d\n", err);
+		return HVD_ERROR;
+	}
+	if (h->av_packet.stream_index != h->video_stream)
+		return HVD_OK;
+
+	if ( (err = avcodec_send_packet(h->decoder_ctx, &h->av_packet) ) < 0 )
+	{
+		fprintf(stderr, "hvd: send_packet error %d\n", err);
+		//EAGAIN means that we need to read data with avcodec_receive_frame before we can push more data to decoder
+		return ( err == AVERROR(EAGAIN) ) ? HVD_AGAIN : HVD_ERROR;
+	}
+
+	return HVD_OK;
+
+	/*
+	int err;
+
 	if(packet)
 	{
 		h->av_packet.data=packet->data;
@@ -317,7 +345,9 @@ int hvd_send_packet(struct hvd *h,struct hvd_packet *packet)
 	}
 
 	return HVD_OK;
+	*/
 }
+
 
 //returns:
 //- non NULL on success
@@ -355,7 +385,7 @@ AVFrame *hvd_receive_frame(struct hvd *h, int *error)
 			fprintf(stderr, "hvd: error while decoding %d\n", ret);
 		return NULL;
 	}
-
+/*
 	if (h->hw_frame->format != h->hw_pix_fmt)
 	{	//this would be the place to add fallback to software but we want to treat it as error
 		fprintf(stderr, "hvd: frame decoded in software (not in hardware)\n");
@@ -371,15 +401,18 @@ AVFrame *hvd_receive_frame(struct hvd *h, int *error)
 		hvd_dump_sw_pix_formats(h);
 		return NULL;
 	}
-
+*/
 	fprintf(stderr, "hvd: decoded frame with pixel format %d %s\n", h->hw_frame->format, av_get_pix_fmt_name(h->hw_frame->format));
 
 	*error=HVD_OK;
 
+	__android_log_print(ANDROID_LOG_DEBUG, "nhvd", "decoded in format %s\n", av_get_pix_fmt_name(h->hw_frame->format));
+
+
 	//TEMP
-	//return h->hw_frame;
-	
-	return h->sw_frame;
+	return h->hw_frame;
+
+	//return h->sw_frame;
 }
 
 static void hvd_dump_sw_pix_formats(struct hvd *h)
