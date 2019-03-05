@@ -71,6 +71,21 @@ void custom_log(void *ptr, int level, const char* fmt, va_list vl)
 	__android_log_vprint(ANDROID_LOG_DEBUG,"hvd", fmt, vl);
 }
 
+static void hvd_av_codec_context_dump(struct AVCodecContext *codec)
+{
+	__android_log_print(ANDROID_LOG_DEBUG, "hvd", "codec_type %d\n", codec->codec_type);
+	__android_log_print(ANDROID_LOG_DEBUG, "hvd", "codec_id %d\n", codec->codec_id);
+	__android_log_print(ANDROID_LOG_DEBUG, "hvd", "profile %d\n", codec->profile);
+	__android_log_print(ANDROID_LOG_DEBUG, "hvd", "level %d\n", codec->level);
+	
+	__android_log_print(ANDROID_LOG_DEBUG, "hvd", "pix fmt %d\n", codec->pix_fmt);
+	__android_log_print(ANDROID_LOG_DEBUG, "hvd", "width %d\n", codec->width);
+	__android_log_print(ANDROID_LOG_DEBUG, "hvd", "height %d\n", codec->height);			
+	
+	if(codec->extradata)
+		__android_log_print(ANDROID_LOG_DEBUG, "hvd", "extradata size %d\n", codec->extradata_size);
+}
+
 //NULL on error
 struct hvd *hvd_init(const struct hvd_config *config)
 {
@@ -193,11 +208,38 @@ struct hvd *hvd_init(const struct hvd_config *config)
 
 	video = h->input_ctx->streams[h->video_stream];
 
+
+	__android_log_print(ANDROID_LOG_DEBUG, "hvd", "BEFORE parameters");
+	hvd_av_codec_context_dump(h->decoder_ctx);
+
+//	h->decoder_ctx->profile=578;
+//	h->decoder_ctx->pix_fmt=0;
+	h->decoder_ctx->width=480;
+	h->decoder_ctx->height=360;
+	
+	if (video->codecpar->extradata)
+	{
+		h->decoder_ctx->extradata = av_mallocz(video->codecpar->extradata_size + AV_INPUT_BUFFER_PADDING_SIZE);
+         // if (!codec->extradata)
+		//  return AVERROR(ENOMEM);
+		memcpy(h->decoder_ctx->extradata, video->codecpar->extradata, video->codecpar->extradata_size);
+		h->decoder_ctx->extradata_size = video->codecpar->extradata_size;
+	}
+ 
+/*
     if (avcodec_parameters_to_context(h->decoder_ctx, video->codecpar) < 0)
 	{
 		fprintf(stderr, "hvd: cannot find a video stream in the input file\n");
 		return hvd_close_and_return_null(h);
 	}
+*/
+	__android_log_print(ANDROID_LOG_DEBUG, "hvd", "AFTER parameters");
+	hvd_av_codec_context_dump(h->decoder_ctx);
+
+	
+	//temp - nullify extradata to check if it is possible to open context
+	//h->decoder_ctx->extradata=0;
+	//h->decoder_ctx->extradata_size=0;
 
 	if (( err = avcodec_open2(h->decoder_ctx, decoder, NULL)) < 0)
 	{
