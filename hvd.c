@@ -193,9 +193,112 @@ static struct hvd *hvd_close_and_return_null(struct hvd *h)
 	return NULL;
 }
 
+int hvd_extract_extradata(struct hvd *h,AVPacket *packet)
+{
+	const AVBitStreamFilter *bsf;
+	int ret;
+	if( (bsf = av_bsf_get_by_name("extract_extradata")) == NULL)
+	{
+		fprintf(stderr, "failed to get extract_extradata bsf\n");
+		return 0;
+	}
+	printf("\nfound bsf\n");
+	
+	AVBSFContext *bsf_context;
+	if( (ret=av_bsf_alloc(bsf, &bsf_context) ) < 0)
+	{
+		fprintf(stderr, "failed to alloc bsf contextx\n");
+		return 0;
+	}
+
+	printf("alloced bsf context\n");
+	
+	if( (ret=avcodec_parameters_from_context(bsf_context->par_in, h->decoder_ctx) ) < 0)
+	{
+		fprintf(stderr, "failed to copy parameters from contextx\n");
+		av_bsf_free(&bsf_context);
+		return 0;
+	}
+	
+	printf("copied bsf params\n");
+
+	if( (ret = av_bsf_init(bsf_context)) < 0 )
+	{
+		fprintf(stderr, "failed to init bsf contextx\n");
+		av_bsf_free(&bsf_context);
+		return 0;		
+	}
+	
+	printf("initialized bsf context\n");
+
+	AVPacket *packet_ref = av_packet_alloc();	
+	if(av_packet_ref(packet_ref, packet) < 0 )
+	{
+		fprintf(stderr, "failed to ref packet\n");
+		av_bsf_free(&bsf_context);
+		return 0;				
+	}
+
+	//make sure refs are used corectly
+	//this probably resests packet
+	if((ret = av_bsf_send_packet(bsf_context, packet_ref)) < 0)
+	{
+		fprintf(stderr, "failed to send packet to bsf\n");
+		av_packet_unref(packet_ref);
+		av_bsf_free(&bsf_context);
+		return 0;				
+	}
+	
+	printf("sent packet to bsf\n");
+
+	int done=0;
+	
+	while (ret >= 0 && !done) //!h->decoder_ctx->extradata)
+	{
+          int extradata_size;
+          uint8_t *extradata;
+		  
+          ret = av_bsf_receive_packet(bsf_context, packet_ref);
+		  if (ret < 0)
+		  {
+			   if (ret != AVERROR(EAGAIN) && ret != AVERROR_EOF)
+			   {
+				   fprintf(stderr, "bsf error, not eagain or eof\n");
+				   return 0;
+			   }
+			   continue;
+		 }
+  
+		 extradata = av_packet_get_side_data(packet_ref, AV_PKT_DATA_NEW_EXTRADATA, &extradata_size);
+ 
+         if (extradata)
+		 {
+			fprintf(stderr, "got extradata, %d size!\n", extradata_size);
+			done=1;
+			h->decoder_ctx->extradata = av_mallocz(extradata_size + AV_INPUT_BUFFER_PADDING_SIZE);
+            // if (!h->decoder_ctx->extradata)
+			 //{
+  //               av_packet_unref(pkt_ref);
+   //              return AVERROR(ENOMEM);
+   //          }
+              memcpy(h->decoder_ctx->extradata, extradata, extradata_size);
+              h->decoder_ctx->extradata_size = extradata_size;
+    //      }
+			av_packet_unref(packet_ref);
+		}
+	}
+	
+	
+	av_packet_free(&packet_ref);
+	av_bsf_free(&bsf_context);
+	
+	return done;
+}
+
 int hvd_send_packet(struct hvd *h,struct hvd_packet *packet)
 {
 	int err;
+	static int extradata=0;
 
 	if(packet)
 	{
@@ -208,14 +311,21 @@ int hvd_send_packet(struct hvd *h,struct hvd_packet *packet)
 		h->av_packet.size = 0;
 	}
 
+	if(!extradata)
+		extradata=hvd_extract_extradata(h, &h->av_packet);
+	
+		
+
+
 	//WARNING The input buffer, av_packet->data must be AV_INPUT_BUFFER_PADDING_SIZE
 	//larger than the actual read bytes because some optimized bitstream readers
 	// read 32 or 64 bits at once and could read over the end.
 	if ( (err = avcodec_send_packet(h->decoder_ctx, &h->av_packet) ) < 0 )
 	{
-		fprintf(stderr, "hvd: send_packet error %d\n", err);
+		fprintf(stderr, "hvd: send_packet error %s\n", av_err2str(err));
 		//EAGAIN means that we need to read data with avcodec_receive_frame before we can push more data to decoder
-		return ( err == AVERROR(EAGAIN) ) ? HVD_AGAIN : HVD_ERROR;
+		//return ( err == AVERROR(EAGAIN) ) ? HVD_AGAIN : HVD_ERROR;
+		return ( err == AVERROR(EAGAIN) ) ? HVD_AGAIN : HVD_OK;
 	}
 
 	return HVD_OK;
