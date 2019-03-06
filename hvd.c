@@ -53,6 +53,7 @@ struct hvd
 	enum AVPixelFormat hw_pix_fmt;
 	enum AVPixelFormat sw_pix_fmt;
 	AVCodecContext *decoder_ctx;
+	AVCodecContext *sw_ctx;
 	AVFormatContext *input_ctx;
 	int video_stream;
 	AVFrame *sw_frame;
@@ -146,13 +147,13 @@ struct hvd *hvd_init(const struct hvd_config *config)
 	}
 */
 
-	if( ( decoder=avcodec_find_decoder_by_name(config->codec) ) == NULL)
+	if( ( decoder=avcodec_find_decoder_by_name("h264") ) == NULL)
 	{
 		fprintf(stderr, "hvd: cannot find decoder %s\n", config->codec);
 		return hvd_close_and_return_null(h);
 	}
 
-	if (!(h->decoder_ctx = avcodec_alloc_context3(decoder)))
+	if (!(h->sw_ctx = avcodec_alloc_context3(decoder)))
 	{
 		fprintf(stderr, "hvd: failed to alloc decoder context, no memory?\n");
 		return hvd_close_and_return_null(h);
@@ -162,7 +163,7 @@ struct hvd *hvd_init(const struct hvd_config *config)
 	//from within FFmpeg using our supplied function for decoder_ctx->get_format.
 	//This is MUCH easier in FFmpeg 4.0 with avcodec_get_hw_config but we want
 	//to support FFmpeg 3.4 (system FFmpeg on Ubuntu 18.04 until 2028).
-	h->decoder_ctx->opaque = h;
+	//h->decoder_ctx->opaque = h;
 	//h->decoder_ctx->get_format = hvd_get_hw_pix_format;
 
 	//specified device or NULL / empty string for default
@@ -185,6 +186,8 @@ struct hvd *hvd_init(const struct hvd_config *config)
 */
 	/* open the input file */
 	// !!! USE device as file name for test
+	
+/*	
     if (avformat_open_input(&h->input_ctx, config->device, NULL, NULL) != 0)
 	{
         fprintf(stderr, "hvd: cannot open input file '%s'\n", config->device);
@@ -197,7 +200,7 @@ struct hvd *hvd_init(const struct hvd_config *config)
 		return hvd_close_and_return_null(h);
     }
 
-    /* find the video stream information */
+    // find the video stream information 
     ret = av_find_best_stream(h->input_ctx, AVMEDIA_TYPE_VIDEO, -1, -1, &stream_decoder, 0);
     if (ret < 0)
 	{
@@ -207,45 +210,26 @@ struct hvd *hvd_init(const struct hvd_config *config)
 	h->video_stream=ret;
 
 	video = h->input_ctx->streams[h->video_stream];
-
-
-	__android_log_print(ANDROID_LOG_DEBUG, "hvd", "BEFORE parameters");
-	hvd_av_codec_context_dump(h->decoder_ctx);
-
-//	h->decoder_ctx->profile=578;
-//	h->decoder_ctx->pix_fmt=0;
-	h->decoder_ctx->width=480;
-	h->decoder_ctx->height=360;
-	
-	if (video->codecpar->extradata)
-	{
-		h->decoder_ctx->extradata = av_mallocz(video->codecpar->extradata_size + AV_INPUT_BUFFER_PADDING_SIZE);
-         // if (!codec->extradata)
-		//  return AVERROR(ENOMEM);
-		memcpy(h->decoder_ctx->extradata, video->codecpar->extradata, video->codecpar->extradata_size);
-		h->decoder_ctx->extradata_size = video->codecpar->extradata_size;
-	}
- 
-/*
-    if (avcodec_parameters_to_context(h->decoder_ctx, video->codecpar) < 0)
-	{
-		fprintf(stderr, "hvd: cannot find a video stream in the input file\n");
-		return hvd_close_and_return_null(h);
-	}
 */
-	__android_log_print(ANDROID_LOG_DEBUG, "hvd", "AFTER parameters");
-	hvd_av_codec_context_dump(h->decoder_ctx);
 
-	
-	//temp - nullify extradata to check if it is possible to open context
-	//h->decoder_ctx->extradata=0;
-	//h->decoder_ctx->extradata_size=0;
-
-	if (( err = avcodec_open2(h->decoder_ctx, decoder, NULL)) < 0)
+	if (( err = avcodec_open2(h->sw_ctx, decoder, NULL)) < 0)
 	{
 		fprintf(stderr, "hvd: failed to initialize decoder context for %s, error %s\n", decoder->name, av_err2str(err));
 		return hvd_close_and_return_null(h);
 	}
+	
+	if( ( decoder=avcodec_find_decoder_by_name("h264_mediacodec") ) == NULL)
+	{
+		fprintf(stderr, "hvd: cannot find decoder %s\n", config->codec);
+		return hvd_close_and_return_null(h);
+	}
+
+	if (!(h->decoder_ctx = avcodec_alloc_context3(decoder)))
+	{
+		fprintf(stderr, "hvd: failed to alloc decoder context, no memory?\n");
+		return hvd_close_and_return_null(h);
+	}
+
 
 	//try to find software pixel format that user wants
 	if(config->pixel_format == NULL || config->pixel_format[0] == '\0')
@@ -328,6 +312,7 @@ void hvd_close(struct hvd* h)
 	avformat_close_input(&h->input_ctx);
 
 	avcodec_free_context(&h->decoder_ctx);
+	avcodec_free_context(&h->sw_ctx);
 	av_buffer_unref(&h->hw_device_ctx);
 
 	free(h);
@@ -339,32 +324,113 @@ static struct hvd *hvd_close_and_return_null(struct hvd *h)
 	return NULL;
 }
 
-int hvd_send_packet(struct hvd *h,struct hvd_packet *packet)
+int hvd_extract_extradata(struct hvd *h,AVPacket *packet)
 {
-	int err;
-
-	av_packet_unref(&h->av_packet);
-
-	if ((err = av_read_frame(h->input_ctx, &h->av_packet)) < 0)
+	const AVBitStreamFilter *bsf;
+	int ret;
+	if( (bsf = av_bsf_get_by_name("extract_extradata")) == NULL)
 	{
-		fprintf(stderr, "hvd: failed to read frame with av_read_frame %d\n", err);
-		return HVD_ERROR;
+		fprintf(stderr, "failed to get extract_extradata bsf\n");
+		return 0;
 	}
-	if (h->av_packet.stream_index != h->video_stream)
-		return HVD_OK;
-
-	if ( (err = avcodec_send_packet(h->decoder_ctx, &h->av_packet) ) < 0 )
+	printf("\nfound bsf\n");
+	
+	AVBSFContext *bsf_context;
+	if( (ret=av_bsf_alloc(bsf, &bsf_context) ) < 0)
 	{
-		fprintf(stderr, "hvd: send_packet error %d\n", err);
-		//EAGAIN means that we need to read data with avcodec_receive_frame before we can push more data to decoder
-		return ( err == AVERROR(EAGAIN) ) ? HVD_AGAIN : HVD_ERROR;
+		fprintf(stderr, "failed to alloc bsf contextx\n");
+		return 0;
 	}
 
-	return HVD_OK;
+	printf("alloced bsf context\n");
+	
+	if( (ret=avcodec_parameters_from_context(bsf_context->par_in, h->sw_ctx) ) < 0)
+	{
+		fprintf(stderr, "failed to copy parameters from contextx\n");
+		av_bsf_free(&bsf_context);
+		return 0;
+	}
+	
+	printf("copied bsf params\n");
 
-	/*
+	if( (ret = av_bsf_init(bsf_context)) < 0 )
+	{
+		fprintf(stderr, "failed to init bsf contextx\n");
+		av_bsf_free(&bsf_context);
+		return 0;		
+	}
+	
+	printf("initialized bsf context\n");
+
+	AVPacket *packet_ref = av_packet_alloc();	
+	if(av_packet_ref(packet_ref, packet) < 0 )
+	{
+		fprintf(stderr, "failed to ref packet\n");
+		av_bsf_free(&bsf_context);
+		return 0;				
+	}
+
+	//make sure refs are used corectly
+	//this probably resests packet
+	if((ret = av_bsf_send_packet(bsf_context, packet_ref)) < 0)
+	{
+		fprintf(stderr, "failed to send packet to bsf\n");
+		av_packet_unref(packet_ref);
+		av_bsf_free(&bsf_context);
+		return 0;				
+	}
+	
+	printf("sent packet to bsf\n");
+
+	int done=0;
+	
+	while (ret >= 0 && !done) //!h->decoder_ctx->extradata)
+	{
+          int extradata_size;
+          uint8_t *extradata;
+		  
+          ret = av_bsf_receive_packet(bsf_context, packet_ref);
+		  if (ret < 0)
+		  {
+			   if (ret != AVERROR(EAGAIN) && ret != AVERROR_EOF)
+			   {
+				   fprintf(stderr, "bsf error, not eagain or eof\n");
+				   return 0;
+			   }
+			   continue;
+		 }
+  
+		 extradata = av_packet_get_side_data(packet_ref, AV_PKT_DATA_NEW_EXTRADATA, &extradata_size);
+ 
+         if (extradata)
+		 {
+			fprintf(stderr, "got extradata, %d size!\n", extradata_size);
+			done=1;
+			h->decoder_ctx->extradata = av_mallocz(extradata_size + AV_INPUT_BUFFER_PADDING_SIZE);
+            // if (!h->decoder_ctx->extradata)
+			 //{
+  //               av_packet_unref(pkt_ref);
+   //              return AVERROR(ENOMEM);
+   //          }
+              memcpy(h->decoder_ctx->extradata, extradata, extradata_size);
+              h->decoder_ctx->extradata_size = extradata_size;
+    //      }
+			av_packet_unref(packet_ref);
+		}
+	}
+	
+	
+	av_packet_free(&packet_ref);
+	av_bsf_free(&bsf_context);
+	
+	return done;
+}
+
+
+int hvd_send_packet(struct hvd *h,struct hvd_packet *packet)
+{	
 	int err;
-
+			
 	if(packet)
 	{
 		h->av_packet.data=packet->data;
@@ -373,7 +439,56 @@ int hvd_send_packet(struct hvd *h,struct hvd_packet *packet)
 	else
 	{	//user requested flushing
 		h->av_packet.data = NULL;
-		h->av_packet.size = 0;
+		h->av_packet.size = 0;	
+	}
+	
+	if(!avcodec_is_open(h->decoder_ctx))
+	{
+		if(hvd_extract_extradata(h, &h->av_packet))
+		{
+			AVCodec *decoder;
+			
+			if( ( decoder=avcodec_find_decoder_by_name("h264_mediacodec") ) == NULL)
+			{
+				fprintf(stderr, "hvd: cannot find decoder %s\n", "h264_mediacodec");
+				return HVD_ERROR;
+			}
+			
+
+			h->decoder_ctx->width=640;
+			h->decoder_ctx->height=368;
+			
+			JNIEnv *jni_env = 0;
+
+			int getEnvStat = (*g_vm)->GetEnv(g_vm,(void**) &jni_env, JNI_VERSION_1_6);
+
+			if (getEnvStat == JNI_EDETACHED)
+			{
+				__android_log_print(ANDROID_LOG_DEBUG, "hvd", "getenv not attached");
+
+				jint result=(*g_vm)->AttachCurrentThread(g_vm, &jni_env, NULL);
+				__android_log_print(ANDROID_LOG_DEBUG, "hvd", "JNI_OK is %d\n", JNI_OK);
+			}
+			else if (getEnvStat == JNI_OK)
+			{//
+				__android_log_print(ANDROID_LOG_DEBUG, "hvd", "already attached\n", JNI_OK);
+			}
+			else if (getEnvStat == JNI_EVERSION)
+				__android_log_print(ANDROID_LOG_DEBUG, "hvd", "get env version not supported");
+
+			av_jni_set_java_vm(g_vm, NULL);
+			
+			if (( err = avcodec_open2(h->decoder_ctx, decoder, NULL)) < 0)
+			{
+				fprintf(stderr, "hvd: failed to initialize decoder context for %s, error %s\n", decoder->name, av_err2str(err));
+				__android_log_print(ANDROID_LOG_DEBUG, "nhvd", "failed to open mediacodec\n");
+				return HVD_ERROR;
+			}
+			__android_log_print(ANDROID_LOG_DEBUG, "nhvd", "opened mediacodec!\n");
+		}
+		else
+			return HVD_OK;
+		
 	}
 
 	//WARNING The input buffer, av_packet->data must be AV_INPUT_BUFFER_PADDING_SIZE
@@ -383,11 +498,11 @@ int hvd_send_packet(struct hvd *h,struct hvd_packet *packet)
 	{
 		fprintf(stderr, "hvd: send_packet error %d\n", err);
 		//EAGAIN means that we need to read data with avcodec_receive_frame before we can push more data to decoder
-		return ( err == AVERROR(EAGAIN) ) ? HVD_AGAIN : HVD_ERROR;
+		__android_log_print(ANDROID_LOG_DEBUG, "nhvd", "failed to send packet... %d\n", err);
+		return ( err == AVERROR(EAGAIN) ) ? HVD_AGAIN : HVD_OK;
 	}
 
 	return HVD_OK;
-	*/
 }
 
 
