@@ -316,6 +316,17 @@ void hvd_close(struct hvd* h)
 	av_buffer_unref(&h->hw_device_ctx);
 
 	free(h);
+
+	if(g_vm == NULL)
+		return;
+
+	JNIEnv *jni_env = 0;
+
+	if((*g_vm)->GetEnv(g_vm,(void**) &jni_env, JNI_VERSION_1_6) == JNI_OK)
+	{
+		jint result=(*g_vm)->DetachCurrentThread(g_vm);
+		__android_log_print(ANDROID_LOG_DEBUG, "hvd", "JVM detach returned %d\n", result);
+	}
 }
 
 static struct hvd *hvd_close_and_return_null(struct hvd *h)
@@ -457,6 +468,7 @@ int hvd_send_packet(struct hvd *h,struct hvd_packet *packet)
 
 			h->decoder_ctx->width=640;
 			h->decoder_ctx->height=368;
+			h->decoder_ctx->profile=FF_PROFILE_H264_CONSTRAINED_BASELINE;
 			
 			JNIEnv *jni_env = 0;
 
