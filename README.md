@@ -10,6 +10,8 @@ See library [documentation](https://bmegli.github.io/hardware-video-decoder/grou
 
 See also twin [HVE](https://github.com/bmegli/hardware-video-encoder) Hardware Video Encoder library.
 
+See [hardware-video-streaming](https://github.com/bmegli/hardware-video-streaming) for other related projects.
+
 ## Intended Use
 
 Raw H.264 (and other codecs) decoding:
