@@ -267,6 +267,8 @@ AVFrame *hvd_receive_frame(struct hvd *h, int *error)
 	// try to supply user software frame in the desired format
 	h->sw_frame->format=h->sw_pix_fmt;
 
+	hvd_dump_sw_pix_formats(h);
+
 	if ( (ret = av_hwframe_transfer_data(h->sw_frame, h->hw_frame, 0) ) < 0)
 	{
 		fprintf(stderr, "hvd: unable to transfer data to system memory - \"%s\"\n", av_err2str(ret));
