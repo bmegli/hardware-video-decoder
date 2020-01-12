@@ -101,7 +101,7 @@ int process_user_input(int argc, char **argv, struct hvd_config *config)
 {
 	if(argc < 3)
 	{
-		fprintf(stderr, "Usage: %s <hardware> <codec> [device]\n\n", argv[0]);
+		fprintf(stderr, "Usage: %s <hardware> <codec> [device] [width] [height] [profile]\n\n", argv[0]);
 		fprintf(stderr, "examples: \n");
 		fprintf(stderr, "%s vaapi h264 \n", argv[0]);
 		fprintf(stderr, "%s vdpau h264 \n", argv[0]);
@@ -110,12 +110,17 @@ int process_user_input(int argc, char **argv, struct hvd_config *config)
 		fprintf(stderr, "%s dxva2 h264 \n", argv[0]);
 		fprintf(stderr, "%s d3d11va h264 \n", argv[0]);
 		fprintf(stderr, "%s videotoolbox h264 \n", argv[0]);
+		fprintf(stderr, "%s vaapi hevc /dev/dri/renderD128 848 480 1 \n", argv[0]);
 		return 1;
 	}
 
 	config->hardware = argv[1];
 	config->codec = argv[2];
 	config->device = argv[3]; //NULL or device, both are ok
+
+	if(argc >= 5) config->width = atoi(argv[4]);
+	if(argc >= 6) config->height = atoi(argv[5]);
+	if(argc >= 7) config->profile = atoi(argv[6]);
 
 	return 0;
 }

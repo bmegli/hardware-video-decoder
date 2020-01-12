@@ -81,6 +81,12 @@ struct hvd *hvd_init(const struct hvd_config *config)
 		return hvd_close_and_return_null(h);
 	}
 
+	h->decoder_ctx->width = config->width;
+	h->decoder_ctx->height = config->height;
+
+	if(config->profile)
+		h->decoder_ctx->profile = config->profile;
+
 	//Set user data carried by AVContext, we need this to determine pixel format
 	//from within FFmpeg using our supplied function for decoder_ctx->get_format.
 	//This is MUCH easier in FFmpeg 4.0 with avcodec_get_hw_config but we want

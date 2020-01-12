@@ -80,6 +80,25 @@ struct hvd;
  * For pixel format explanation see:
  * <a href="https://ffmpeg.org/doxygen/3.4/pixfmt_8h.html#a9a8e335cf3be472042bc9f0cf80cd4c5">FFmpeg pixel formats</a>
  *
+ * You typically don't have to specify width, height and profile (leave as 0) but some codecs need this information.
+ *
+ * For width and height the decoder may overwrite your values while parsing the data.
+ * It is not safe to assume that width/height of decoded frame matches what you supplied.
+ *
+ * For possible profiles see:
+ * <a href="https://ffmpeg.org/doxygen/3.4/avcodec_8h.html#ab424d258655424e4b1690e2ab6fcfc66">FFmpeg profiles</a>
+ *
+ * For H.264 profile can typically be:
+ * - FF_PROFILE_H264_CONSTRAINED_BASELINE
+ * - FF_PROFILE_H264_MAIN
+ * - FF_PROFILE_H264_HIGH
+ * - ...
+ *
+ * For HEVC profile can typically be:
+ * - FF_PROFILE_HEVC_MAIN
+ * - FF_PROFILE_HEVC_MAIN_10 (10 bit channel precision)
+ * - ...
+ *
  * @see hvd_init
  */
 struct hvd_config
@@ -88,6 +107,9 @@ struct hvd_config
 	const char *codec; //!< codec name, e.g. "h264", "vp8"
 	const char *device; //!< NULL / "" or device, e.g. "/dev/dri/renderD128"
 	const char *pixel_format; //!< NULL / "" for default or format, e.g. "rgb0", "bgr0", "nv12", "yuv420p"
+	int width; //!< 0 to not specify, needed by some codecs
+	int height; //!< 0 to not specify, needed by some codecs
+	int profile; //!< 0 to leave as FF_PROFILE_UNKNOWN or profile e.g. FF_PROFILE_HEVC_MAIN, ...
 };
 
 /**
