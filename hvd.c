@@ -219,7 +219,11 @@ int hvd_send_packet(struct hvd *h,struct hvd_packet *packet)
 	// read 32 or 64 bits at once and could read over the end.
 	if ( (err = avcodec_send_packet(h->decoder_ctx, &h->av_packet) ) < 0 )
 	{
-		fprintf(stderr, "hvd: send_packet error %d\n", err);
+		fprintf(stderr, "hvd: send_packet error %s\n", av_err2str(err));
+
+		//e.g. non-existing PPS referenced, keep pushing packets
+		if(err == AVERROR_INVALIDDATA) return HVD_OK;
+
 		//EAGAIN means that we need to read data with avcodec_receive_frame before we can push more data to decoder
 		return ( err == AVERROR(EAGAIN) ) ? HVD_AGAIN : HVD_ERROR;
 	}
