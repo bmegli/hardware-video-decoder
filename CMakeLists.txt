@@ -4,7 +4,7 @@ project(
     hvd
 )
 
-add_library(hvd SHARED hvd.c)
+add_library(hvd hvd.c)
 target_link_libraries(hvd avcodec avutil)
 install(TARGETS hvd DESTINATION lib)
 install(FILES hvd.h DESTINATION include)
