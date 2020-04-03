@@ -1,7 +1,7 @@
 /*
  * HVD Hardware Video Decoder C library imlementation
  *
- * Copyright 2019 (C) Bartosz Meglicki <meglickib@gmail.com>
+ * Copyright 2019-2020 (C) Bartosz Meglicki <meglickib@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -181,16 +181,9 @@ int hvd_send_packet(struct hvd *h,struct hvd_packet *packet)
 {
 	int err;
 
-	if(packet)
-	{
-		h->av_packet.data=packet->data;
-		h->av_packet.size=packet->size;
-	}
-	else
-	{	//user requested flushing
-		h->av_packet.data = NULL;
-		h->av_packet.size = 0;
-	}
+	//NULL packet is legal and means user requested flushing
+	h->av_packet.data = (packet) ? packet->data : NULL;
+	h->av_packet.size = (packet) ? packet->size : 0;
 
 	//WARNING The input buffer, av_packet->data must be AV_INPUT_BUFFER_PADDING_SIZE
 	//larger than the actual read bytes because some optimized bitstream readers
@@ -239,7 +232,7 @@ AVFrame *hvd_receive_frame(struct hvd *h, int *error)
 			avcodec_flush_buffers(avctx);
 
 		if(*error)
-			fprintf(stderr, "hvd: error while decoding %d\n", ret);
+			fprintf(stderr, "hvd: error while decoding - \"%s\"\n", av_err2str(ret));
 
 		return NULL;
 	}
