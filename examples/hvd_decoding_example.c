@@ -127,7 +127,7 @@ int process_user_input(int argc, char **argv, struct hvd_config *config)
 
 int hint_on_init_failure_and_return_1(const struct hvd_config *hardware_config)
 {
-	fprintf(stderr, "faied to initalize hardware decoder for %s\n", hardware_config->hardware);
+	fprintf(stderr, "failed to initalize hardware decoder for %s\n", hardware_config->hardware);
 	fprintf(stderr, "hints:\n");
 	fprintf(stderr, "- try using other device? (not %s)\n", hardware_config->device ? hardware_config->device : "NULL");
 	fprintf(stderr, "- try using other hardware? (not %s)\n", hardware_config->hardware);
