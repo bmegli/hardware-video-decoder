@@ -192,8 +192,9 @@ int hvd_send_packet(struct hvd *h,struct hvd_packet *packet)
 	{
 		fprintf(stderr, "hvd: send_packet error %s\n", av_err2str(err));
 
-		//e.g. non-existing PPS referenced, keep pushing packets
-		if(err == AVERROR_INVALIDDATA) return HVD_OK;
+		//e.g. non-existing PPS referenced, could not find ref with POC, keep pushing packets
+		if(err == AVERROR_INVALIDDATA || err == AVERROR(EIO))
+			return HVD_OK;
 
 		//EAGAIN means that we need to read data with avcodec_receive_frame before we can push more data to decoder
 		return ( err == AVERROR(EAGAIN) ) ? HVD_AGAIN : HVD_ERROR;
