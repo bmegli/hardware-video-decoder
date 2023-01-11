@@ -129,6 +129,9 @@ static enum AVPixelFormat hvd_find_pixel_fmt_by_hw_type(const enum AVHWDeviceTyp
 	case AV_HWDEVICE_TYPE_VIDEOTOOLBOX:
 		fmt = AV_PIX_FMT_VIDEOTOOLBOX;
 		break;
+	case AV_HWDEVICE_TYPE_CUDA:
+		fmt = AV_PIX_FMT_CUDA;
+		break;
 	default:
 		fmt = AV_PIX_FMT_NONE;
 		break;
