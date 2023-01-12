@@ -3,7 +3,7 @@
 This library wraps hardware video decoding in a simple interface.
 There are no performance loses (at the cost of library flexibility).
 
-Currently it supports VAAPI, VDPAU (tested) and a few other hardware decoders (not tested).
+Currently it supports VAAPI, VDPAU, NVDEC/CUVID (tested) and a few other hardware decoders (not tested).\
 Various codecs are supported (e.g. H.264, HEVC, VP8, VP9)
 
 See library [documentation](https://bmegli.github.io/hardware-video-decoder/group__interface.html).
@@ -30,7 +30,8 @@ Cross-platform but tested only on Linux (Ubuntu 18.04).
 Tested with:
 - Intel VAAPI compatible hardware decoders ([Quick Sync Video](https://ark.intel.com/Search/FeatureFilter?productType=processors&QuickSyncVideo=true))
 - AMD/ATI VAAPI compatible hardware decoders
-- VDPAU compatible hardware decoders (e.g. Nvidia GPU) 
+- VDPAU compatible hardware decoders (e.g. Nvidia GPU)
+- Nvidia NVDEC compatible hardware decoders (e.g. Nvidia GPU)
 
 Also implemented (but not tested):
 - DirectX 9 Video Acceleration (dxva2)
@@ -42,11 +43,13 @@ Also implemented (but not tested):
 Library depends on:
 - FFmpeg `avcodec` and `avutil` (at least 3.4 version)
 
-Works with system FFmpeg on Ubuntu 18.04 and doesn't on 16.04 (outdated FFmpeg and VAAPI ecosystem).
+Works with:
+- system FFmpeg on Ubuntu 18.04
+- system FFmpeg on Ubuntu 20.04
 
 ## Building Instructions
 
-Tested on Ubuntu 18.04.
+Tested on Ubuntu 18.04 and 20.04
 
 ``` bash
 # update package repositories
