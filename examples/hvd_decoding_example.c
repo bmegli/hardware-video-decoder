@@ -1,7 +1,7 @@
 /*
  * HVD Hardware Video Decoder example (template for simple program)
  *
- * Copyright 2019 (C) Bartosz Meglicki <meglickib@gmail.com>
+ * Copyright 2019-2023 (C) Bartosz Meglicki <meglickib@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -110,6 +110,8 @@ int process_user_input(int argc, char **argv, struct hvd_config *config)
 		fprintf(stderr, "%s dxva2 h264 \n", argv[0]);
 		fprintf(stderr, "%s d3d11va h264 \n", argv[0]);
 		fprintf(stderr, "%s videotoolbox h264 \n", argv[0]);
+		fprintf(stderr, "%s cuda h264_cuvid \n", argv[0]);
+		fprintf(stderr, "%s cuda hevc_cuvid \n", argv[0]);
 		fprintf(stderr, "%s vaapi hevc /dev/dri/renderD128 848 480 1 \n", argv[0]);
 		return 1;
 	}

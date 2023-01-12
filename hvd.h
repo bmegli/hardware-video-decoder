@@ -1,7 +1,7 @@
 /*
  * HVD Hardware Video Decoder C library header
  *
- * Copyright 2019-2020 (C) Bartosz Meglicki <meglickib@gmail.com>
+ * Copyright 2019-2023 (C) Bartosz Meglicki <meglickib@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -52,6 +52,7 @@ struct hvd;
  * - dxva2
  * - d3d11va
  * - videotoolbox
+ * - cuda (for Nvidia NVDEC/CUVID)
  *
  * The device can be:
  * - NULL (select automatically)
@@ -63,12 +64,22 @@ struct hvd;
  * - vp8
  * - vp9
  * - ...
+ * - h264_cuvid (Nvidia NVDEC/CUVID decoder)
+ * - hevc_cuvid (Nvidia NVDEC/CUVID decoder)
+ * - ...
+ *
+ * When using Nvidia (hardware == "cuda") you need to specify codec as "[codec]_cuvid" (e.g. "h264_cuvid")
  *
  * The pixel_format is format you want to receive data in.
  * Only hardware conversions are supported. If you select
  * something unsupported by hardware, the library will dump for you
  * list of supported pixel formats to standard error. From my experience
  * even those reported are not supported in all scenarios.
+ *
+ * Nvidia cuvid (h264_cuvid, hevc_cuvid, ...) has a quirk.
+ * If you select pixel format unsupported by hardware it will silently
+ * return data in nv12 (or p010le, p016le, ... depending on bit depth)
+ * The frame format may still be set to what you requested.
  *
  * Typical examples:
  * - nv12

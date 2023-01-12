@@ -1,7 +1,7 @@
 /*
  * HVD Hardware Video Decoder C library imlementation
  *
- * Copyright 2019-2020 (C) Bartosz Meglicki <meglickib@gmail.com>
+ * Copyright 2019-2023 (C) Bartosz Meglicki <meglickib@gmail.com>
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -128,6 +128,9 @@ static enum AVPixelFormat hvd_find_pixel_fmt_by_hw_type(const enum AVHWDeviceTyp
 		break;
 	case AV_HWDEVICE_TYPE_VIDEOTOOLBOX:
 		fmt = AV_PIX_FMT_VIDEOTOOLBOX;
+		break;
+	case AV_HWDEVICE_TYPE_CUDA:
+		fmt = AV_PIX_FMT_CUDA;
 		break;
 	default:
 		fmt = AV_PIX_FMT_NONE;
