@@ -68,7 +68,11 @@ struct hvd;
  * - hevc_cuvid (Nvidia NVDEC/CUVID decoder)
  * - ...
  *
- * When using Nvidia (hardware == "cuda") you need to specify codec as "[codec]_cuvid" (e.g. "h264_cuvid")
+ * When using Nvidia (hardware == "cuda") you may specify codec as
+ * - "[codec]" like "h264" -> results in NVDEC
+ * - "[codec]_cuvid" like "h264_cuvid" -> results in CUVID
+ * Those settings lead to different codepaths.
+ * NVDEC path is recommended for low latency.
  *
  * The pixel_format is format you want to receive data in.
  * Only hardware conversions are supported. If you select
@@ -76,10 +80,10 @@ struct hvd;
  * list of supported pixel formats to standard error. From my experience
  * even those reported are not supported in all scenarios.
  *
- * Nvidia cuvid (h264_cuvid, hevc_cuvid, ...) has a quirk.
+ * Nvidia (hardware == "cuda") has a quirk.
  * If you select pixel format unsupported by hardware it will silently
  * return data in nv12 (or p010le, p016le, ... depending on bit depth)
- * The frame format may still be set to what you requested.
+ * The frame format may still be incorrectly set to what you requested!
  *
  * Typical examples:
  * - nv12

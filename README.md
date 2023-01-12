@@ -43,9 +43,7 @@ Also implemented (but not tested):
 Library depends on:
 - FFmpeg `avcodec` and `avutil` (at least 3.4 version)
 
-Works with:
-- system FFmpeg on Ubuntu 18.04
-- system FFmpeg on Ubuntu 20.04
+Works with system FFmpeg on Ubuntu 18.04/20.04
 
 ## Building Instructions
 
