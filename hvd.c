@@ -13,6 +13,7 @@
 
 // FFmpeg
 #include <libavcodec/avcodec.h>
+#include <libavcodec/version.h>
 #include <libavutil/hwcontext.h>
 #include <libavutil/pixdesc.h>
 
@@ -50,7 +51,9 @@ struct hvd *hvd_init(const struct hvd_config *config)
 
 	*h = zero_hvd; //set all members of dynamically allocated struct to 0 in a portable way
 
+#if LIBAVCODEC_VERSION_MAJOR < 59
 	avcodec_register_all();
+#endif
 	av_log_set_level(AV_LOG_VERBOSE);
 
 	if( (hardware_type = av_hwdevice_find_type_by_name(config->hardware) ) == AV_HWDEVICE_TYPE_NONE )
